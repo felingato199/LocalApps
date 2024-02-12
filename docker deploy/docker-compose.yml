@@ -1,0 +1,54 @@
+version: '3'
+services:
+  listcore:
+    image: admindatabik/listcore:v1.10
+    container_name: listcore
+    env_file:
+      - ./configs/listcore.env
+    restart: always 
+    command: gunicorn --bind 0.0.0.0:8000 --reload Proyecto.wsgi:application --log-level debug --timeout 1000
+
+  listcoreworkers:
+    image: admindatabik/listcore:v1.10
+    restart: always
+    command: celery -A Proyecto worker -l INFO
+    env_file:
+      - ./configs/listcore.env
+
+  massive:
+    image: admindatabik/listcore:v1.10
+    restart: always
+    command: celery -A Proyecto worker -l INFO --concurrency=3 -Q massive
+    env_file:
+      - ./configs/listcore.env
+
+
+  mainapp:
+    image: admindatabik/mainappbackend:v0.12
+    restart: always
+    command: gunicorn --bind 0.0.0.0:8000 --reload mainapp:app --log-level debug --timeout 1000 --threads=16 --workers=10
+    ports: 
+      - 8091:8000
+
+    env_file:
+      - ./configs/mainapp.env
+  
+  mainappworkers:
+    image: admindatabik/mainappbackend:v0.12
+    restart: always
+    command: celery -A localworkers worker -l INFO --concurrency=1
+    env_file:
+      - ./configs/mainapp.env
+  mainappscheduler:
+    image: admindatabik/mainappbackend:v0.12
+    restart: always
+    command: celery -A localworkers beat -l INFO
+    env_file:
+      - ./configs/mainapp.env
+  
+
+
+networks:
+  default:
+    external: true
+    name: confilist_apps_network
